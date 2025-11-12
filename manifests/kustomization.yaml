@@ -1,0 +1,4 @@
+resources:
+- postgresql.deployment.yaml
+- postgresql.configmap.yaml
+- postgresql.svc.yaml

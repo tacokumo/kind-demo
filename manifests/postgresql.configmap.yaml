@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-initdb
+  namespace: tacokumo-admin
+  labels:
+    app: postgresql
+data:
+  init.sql: |
+    -- Create tacokumo_admin_db database
+    CREATE DATABASE tacokumo_admin_db;
+    -- Create tacokumo_admin_dev database for atlas temporary usage
+    CREATE DATABASE tacokumo_admin_dev;
+
+    -- Create user with tacokumo_admin_db permissions
+    CREATE USER admin_api WITH PASSWORD 'password';
+    GRANT CONNECT ON DATABASE tacokumo_admin_db TO admin_api;
+    
+    -- Connect to the tacokumo_admin_db database to set up schema permissions
+    \c tacokumo_admin_db
+
+    -- Create tacokumo_admin schema and grant ownership to admin_api
+    CREATE SCHEMA IF NOT EXISTS tacokumo_admin AUTHORIZATION admin_api;
+
+    -- Set search_path for admin_api user to include tacokumo_admin schema
+    ALTER USER admin_api SET search_path = tacokumo_admin, public;

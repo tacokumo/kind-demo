@@ -16,11 +16,11 @@ releases:
   namespace: tacokumo-admin
   createNamespace: true
   chart: tacokumo-admin/tacokumo-admin
-  version: 0.1.0
+  version: 0.1.6
   values:
   - values/tacokumo-admin.yaml
   - api:
       config:
         auth:
           domain: "{{ .StateValues.tacokuAdminAPIAuth0Domain }}"
-          audience: "{{ .StateValues.tacokuAdminAPIAuth0Audience}}"
+          audience: "{{ .StateValues.tacokuAdminAPIAuth0Audience }}"
