@@ -24,3 +24,9 @@ releases:
         auth:
           domain: "{{ .StateValues.tacokuAdminAPIAuth0Domain }}"
           audience: "{{ .StateValues.tacokuAdminAPIAuth0Audience }}"
+- name: portal-controller-kubernetes
+  namespace: portal-controller-system
+  createNamespace: true
+  chart: tacokumo-admin/portal-controller-kubernetes
+  version: 0.1.3
+  values: []
