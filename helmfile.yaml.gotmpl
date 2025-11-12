@@ -1,22 +1,22 @@
 repositories:
-- name: ingress-nginx
-  url: https://kubernetes.github.io/ingress-nginx
+# - name: ingress-nginx
+#   url: https://kubernetes.github.io/ingress-nginx
 - name: tacokumo-admin
   url: https://tacokumo.github.io/helm-charts
 
 releases:
-- name: ingress-nginx
-  namespace: ingress-nginx
-  createNamespace: true
-  chart: ingress-nginx/ingress-nginx
-  version: 4.14.0
-  values:
-  - values/ingress-nginx.yaml
+# - name: ingress-nginx
+#   namespace: ingress-nginx
+#   createNamespace: true
+#   chart: ingress-nginx/ingress-nginx
+#   version: 4.14.0
+#   values:
+#   - values/ingress-nginx.yaml
 - name: tacokumo-admin
   namespace: tacokumo-admin
   createNamespace: true
   chart: tacokumo-admin/tacokumo-admin
-  version: 0.1.6
+  version: 0.1.7
   values:
   - values/tacokumo-admin.yaml
   - api:
@@ -28,5 +28,5 @@ releases:
   namespace: portal-controller-system
   createNamespace: true
   chart: tacokumo-admin/portal-controller-kubernetes
-  version: 0.1.4
+  version: 0.1.8
   values: []
