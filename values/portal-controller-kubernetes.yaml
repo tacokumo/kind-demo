@@ -1,0 +1,5 @@
+controller:
+  managerContainer:
+    image:
+      repository: ghcr.io/tacokumo/portal-controller-kubernetes
+      tag: main-arm

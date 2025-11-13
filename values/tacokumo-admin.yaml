@@ -1,0 +1,5 @@
+api:
+  apiContainer:
+    image:
+      repository: ghcr.io/tacokumo/admin-api
+      tag: main-arm
