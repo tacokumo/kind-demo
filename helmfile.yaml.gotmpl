@@ -16,14 +16,13 @@ releases:
   namespace: tacokumo-admin
   createNamespace: true
   chart: tacokumo-admin/tacokumo-admin
-  version: 0.1.7
+  version: 0.1.8
   values:
   - values/tacokumo-admin.yaml
-  - api:
-      config:
-        auth:
-          domain: "{{ .StateValues.tacokuAdminAPIAuth0Domain }}"
-          audience: "{{ .StateValues.tacokuAdminAPIAuth0Audience }}"
+  - github:
+      oauth:
+        callbackUrl: "{{ .StateValues.githubOAuthCallbackUrl }}"
+        allowedOrgs: "{{ .StateValues.githubOAuthAllowedOrgs }}"
 - name: portal-controller-kubernetes
   namespace: portal-controller-system
   createNamespace: true

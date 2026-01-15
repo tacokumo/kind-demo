@@ -32,29 +32,27 @@ function create_admindb_secret() {
     fi
 }
 
-function create_auth0_secret() {
-    echo "Creating Auth0 credentials secret..."
+function create_github_oauth_secret() {
+    echo "Creating GitHub OAuth credentials secret..."
 
-    # Check if required Auth0 environment variables are set
-    if [[ -z "${AUTH0_DOMAIN}" || -z "${AUTH0_CLIENT_ID}" || -z "${AUTH0_CLIENT_SECRET}" ]]; then
-        echo "Error: AUTH0_DOMAIN, AUTH0_CLIENT_ID, and AUTH0_CLIENT_SECRET environment variables must be set"
+    # Check if required GitHub OAuth environment variables are set
+    if [[ -z "${GITHUB_CLIENT_ID}" || -z "${GITHUB_CLIENT_SECRET}" ]]; then
+        echo "Error: GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET environment variables must be set"
         echo "Please set these variables before running the script:"
-        echo "  export AUTH0_DOMAIN=your-domain.auth0.com"
-        echo "  export AUTH0_CLIENT_ID=your-client-id"
-        echo "  export AUTH0_CLIENT_SECRET=your-client-secret"
+        echo "  export GITHUB_CLIENT_ID=your-client-id"
+        echo "  export GITHUB_CLIENT_SECRET=your-client-secret"
         exit 1
     fi
 
     # Check if secret already exists
-    if kubectl get secret tacokumo-admin-auth0-credentials -n tacokumo-admin >/dev/null 2>&1; then
-        echo "Auth0 secret 'tacokumo-admin-auth0-credentials' already exists, skipping creation..."
+    if kubectl get secret tacokumo-admin-github-oauth -n tacokumo-admin >/dev/null 2>&1; then
+        echo "GitHub OAuth secret 'tacokumo-admin-github-oauth' already exists, skipping creation..."
     else
-        kubectl create secret generic tacokumo-admin-auth0-credentials \
-            --from-literal=domain="${AUTH0_DOMAIN}" \
-            --from-literal=clientId="${AUTH0_CLIENT_ID}" \
-            --from-literal=clientSecret="${AUTH0_CLIENT_SECRET}" \
+        kubectl create secret generic tacokumo-admin-github-oauth \
+            --from-literal=clientId="${GITHUB_CLIENT_ID}" \
+            --from-literal=clientSecret="${GITHUB_CLIENT_SECRET}" \
             --namespace=tacokumo-admin
-        echo "Auth0 secret 'tacokumo-admin-auth0-credentials' created successfully"
+        echo "GitHub OAuth secret 'tacokumo-admin-github-oauth' created successfully"
     fi
 }
 
@@ -157,9 +155,14 @@ function migrate_admin_db() {
 
 function apply_helmfile() {
     echo "Applying Helm charts using Helmfile..."
+
+    # Set defaults for optional environment variables
+    GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-"http://localhost:8080/v1alpha1/auth/callback"}
+    GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-""}
+
     helmfile sync -f helmfile.yaml.gotmpl \
-        --state-values-set tacokuAdminAPIAuth0Domain="${TACOKUMO_ADMIN_API_AUTH0_DOMAIN}" \
-        --state-values-set tacokuAdminAPIAuth0Audience="${TACOKUMO_ADMIN_API_AUTH0_AUDIENCE}"
+        --state-values-set githubOAuthCallbackUrl="${GITHUB_OAUTH_CALLBACK_URL}" \
+        --state-values-set githubOAuthAllowedOrgs="${GITHUB_OAUTH_ALLOWED_ORGS}"
 }
 
 setup_cluster
@@ -167,5 +170,5 @@ setup_cluster
 setup_admin_db
 clone_admin_api
 migrate_admin_db
-create_auth0_secret
+create_github_oauth_secret
 apply_helmfile

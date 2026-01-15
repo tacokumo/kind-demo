@@ -1,5 +1,92 @@
+# Global configuration
+global:
+  externalServices:
+    postgresql:
+      host: "postgresql.tacokumo-admin.svc.cluster.local"
+      port: 5432
+      database: "tacokumo_admin_db"
+      username: "admin_api"
+      secretName: "tacokumo-admin-db-credentials"
+    redis:
+      host: "redis.tacokumo-admin.svc.cluster.local"
+      port: 6379
+      # secretName: "tacokumo-admin-redis-credentials"  # 認証なしの場合はコメントアウト
+
+# GitHub OAuth configuration
+github:
+  oauth:
+    secretName: "tacokumo-admin-github-oauth"
+    # callbackUrl と allowedOrgs は helmfile から注入
+  session:
+    ttl: "24h"
+
+# Admin API configuration
 api:
-  apiContainer:
-    image:
-      repository: ghcr.io/tacokumo/admin-api
-      tag: main-arm
+  replicaCount: 1
+  image:
+    repository: ghcr.io/tacokumo/admin-api
+    tag: main-arm
+    pullPolicy: IfNotPresent
+  config:
+    addr: "0.0.0.0"
+    port: 8080
+    logLevel: "info"
+    opentelemetry:
+      enabled: false
+    cors:
+      allow_origins: "*"
+      allow_methods: "GET, POST, PUT, DELETE, OPTIONS"
+      allow_headers: "Authorization, Content-Type"
+      expose_headers: "Content-Type,Authorization"
+      allow_credentials: true
+      max_age: 86400
+    tls:
+      enabled: false
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  serviceAccount:
+    name: tacokumo-admin-api
+    create: true
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+# Admin UI configuration
+ui:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/tacokumo/admin-ui
+    tag: main-arm
+    pullPolicy: IfNotPresent
+  config:
+    apiBaseUrl: "http://tacokumo-admin-api:8080"
+    cors:
+      origin: "*"
+      methods: "GET,POST,PUT,DELETE,OPTIONS"
+      allowHeaders: "Content-Type,Authorization"
+      credentials: false
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  serviceAccount:
+    name: tacokumo-admin-ui
+    create: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 10m
+      memory: 128Mi
+
+# Ingress (disabled for local development)
+ingress:
+  enabled: false
