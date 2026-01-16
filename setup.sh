@@ -110,61 +110,130 @@ function migrate_admin_db() {
         exit 1
     fi
 
-    # Start port-forward in background
-    echo "Setting up port-forward to PostgreSQL service..."
-    kubectl port-forward -n tacokumo-admin service/postgresql 5432:5432 &
-    PORT_FORWARD_PID=$!
-
-    # Wait for port-forward to establish and database to be ready
-    echo "Waiting for port-forward to establish and database to be ready..."
-    sleep 10
-
-    # Additional check: wait for port to be available
-    for i in {1..30}; do
-        # Try multiple methods to check if port is available
-        if nc -z localhost 5432 2>/dev/null || \
-           timeout 2 bash -c "</dev/tcp/localhost/5432" 2>/dev/null || \
-           lsof -i :5432 >/dev/null 2>&1; then
-            echo "Port-forward established successfully"
-            break
-        fi
-        echo "Waiting for port-forward... ($i/30)"
-        sleep 2
-    done
-
-    # Final check: ensure PostgreSQL pod is ready
-    echo "Ensuring PostgreSQL pod is ready..."
+    # First ensure PostgreSQL pod is ready before port-forwarding
+    echo "Waiting for PostgreSQL pod to be ready..."
     kubectl wait --for=condition=ready pod -l app=postgresql -n tacokumo-admin --timeout=300s
 
-    # Run migration
+    # Additional wait for database initialization
+    echo "Waiting for PostgreSQL database to be fully initialized..."
+    sleep 15
+
+    # Kill any existing port-forward processes on port 5432
+    echo "Cleaning up any existing port-forward processes..."
+    if lsof -ti:5432 >/dev/null 2>&1; then
+        lsof -ti:5432 | xargs kill -9 2>/dev/null || true
+    fi
+    sleep 2
+
+    # Start port-forward in background with improved error handling
+    echo "Setting up port-forward to PostgreSQL service..."
+    kubectl port-forward -n tacokumo-admin service/postgresql 5432:5432 > /tmp/port-forward.log 2>&1 &
+    PORT_FORWARD_PID=$!
+
+    # Give port-forward some time to establish
+    sleep 5
+
+    # Verify port-forward process is still running
+    if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+        echo "Error: Port-forward process failed to start. Log:"
+        cat /tmp/port-forward.log
+        exit 1
+    fi
+
+    # Wait for port to be available with improved checking
+    echo "Waiting for port-forward to establish..."
+    PORT_READY=false
+    for i in {1..60}; do
+        # Check if port is listening and responding
+        if timeout 3 bash -c "echo > /dev/tcp/localhost/5432" 2>/dev/null; then
+            echo "Port-forward established successfully"
+            PORT_READY=true
+            break
+        fi
+        echo "Waiting for port-forward... ($i/60)"
+        sleep 2
+
+        # Check if port-forward process is still alive
+        if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
+            echo "Error: Port-forward process died. Restarting..."
+            kubectl port-forward -n tacokumo-admin service/postgresql 5432:5432 > /tmp/port-forward.log 2>&1 &
+            PORT_FORWARD_PID=$!
+            sleep 3
+        fi
+    done
+
+    if [ "$PORT_READY" = false ]; then
+        echo "Error: Could not establish port-forward after 120 seconds"
+        echo "Port-forward log:"
+        cat /tmp/port-forward.log
+        kill $PORT_FORWARD_PID 2>/dev/null || true
+        exit 1
+    fi
+
+    # Test database connectivity before migration
+    echo "Testing database connectivity..."
+    for i in {1..10}; do
+        if timeout 5 psql "postgresql://postgres:password@localhost:5432/postgres" -c "SELECT 1;" >/dev/null 2>&1; then
+            echo "Database connection test successful"
+            break
+        fi
+        echo "Database connection test failed, retrying... ($i/10)"
+        sleep 3
+
+        if [ $i -eq 10 ]; then
+            echo "Error: Could not connect to database after 10 attempts"
+            kill $PORT_FORWARD_PID 2>/dev/null || true
+            exit 1
+        fi
+    done
+
+    # Run migration with retry logic
     echo "Running database migration..."
     cd tmp/admin-api
 
-    # Check if running on macOS and adjust host accordingly
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS - use host.docker.internal for Docker to access host
-        docker run --rm \
-            -v "$(pwd)/sql/schema.sql:/schema.sql" \
-            arigaio/atlas:latest schema apply \
-            --url "postgres://admin_api:password@host.docker.internal:5432/tacokumo_admin_db?sslmode=disable" \
-            --dev-url "postgres://postgres:password@host.docker.internal:5432/postgres?sslmode=disable" \
-            --to "file:///schema.sql" --auto-approve
-    else
-        # Linux - use --network host
-        make migrate IS_DOCKER=false HOST=localhost PORT=5432 USER=admin_api PASSWORD=password DB=tacokumo_admin_db DEV_USER=postgres DEV_PASSWORD=password DEV_DB=postgres
-    fi
-    MIGRATION_EXIT_CODE=$?
+    MIGRATION_SUCCESS=false
+    for attempt in {1..3}; do
+        echo "Migration attempt $attempt/3..."
+
+        # Check if running on macOS and adjust host accordingly
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS - use host.docker.internal for Docker to access host
+            docker run --rm \
+                -v "$(pwd)/sql/schema.sql:/schema.sql" \
+                arigaio/atlas:latest schema apply \
+                --url "postgres://admin_api:password@host.docker.internal:5432/tacokumo_admin_db?sslmode=disable" \
+                --dev-url "postgres://postgres:password@host.docker.internal:5432/postgres?sslmode=disable" \
+                --to "file:///schema.sql" --auto-approve
+        else
+            # Linux - use --network host
+            make migrate IS_DOCKER=false HOST=localhost PORT=5432 USER=admin_api PASSWORD=password DB=tacokumo_admin_db DEV_USER=postgres DEV_PASSWORD=password DEV_DB=postgres
+        fi
+
+        MIGRATION_EXIT_CODE=$?
+
+        if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
+            echo "Database migration completed successfully"
+            MIGRATION_SUCCESS=true
+            break
+        else
+            echo "Migration attempt $attempt failed with exit code $MIGRATION_EXIT_CODE"
+            if [ $attempt -lt 3 ]; then
+                echo "Retrying in 10 seconds..."
+                sleep 10
+            fi
+        fi
+    done
+
     cd ../..
 
     # Kill port-forward process
     echo "Cleaning up port-forward..."
     kill $PORT_FORWARD_PID 2>/dev/null || true
+    rm -f /tmp/port-forward.log
 
-    if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
-        echo "Database migration completed successfully"
-    else
-        echo "Database migration failed with exit code $MIGRATION_EXIT_CODE"
-        exit $MIGRATION_EXIT_CODE
+    if [ "$MIGRATION_SUCCESS" = false ]; then
+        echo "Database migration failed after 3 attempts"
+        exit 1
     fi
 }
 

@@ -2,5 +2,5 @@ resources:
 - postgresql.deployment.yaml
 - postgresql.configmap.yaml
 - postgresql.svc.yaml
-- redis.deployment.yaml
-- redis.svc.yaml
+- valkey.deployment.yaml
+- valkey.svc.yaml
