@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis
+  name: valkey
   namespace: tacokumo-admin
   labels:
-    app: redis
+    app: valkey
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis
+      app: valkey
   template:
     metadata:
       labels:
-        app: redis
+        app: valkey
     spec:
       containers:
-      - name: redis
-        image: redis:7.4-alpine
+      - name: valkey
+        image: valkey/valkey:8-alpine
         ports:
         - containerPort: 6379
           name: redis

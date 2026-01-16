@@ -8,9 +8,9 @@ global:
       username: "admin_api"
       secretName: "tacokumo-admin-db-credentials"
     redis:
-      host: "redis.tacokumo-admin.svc.cluster.local"
+      host: "valkey.tacokumo-admin.svc.cluster.local"
       port: 6379
-      # secretName: "tacokumo-admin-redis-credentials"  # 認証なしの場合はコメントアウト
+      # secretName: "tacokumo-admin-valkey-credentials"  # 認証なしの場合はコメントアウト
 
 # GitHub OAuth configuration
 github:
@@ -75,7 +75,7 @@ ui:
   service:
     type: ClusterIP
     port: 3000
-    targetPort: 3000
+    targetPort: 80
   serviceAccount:
     name: tacokumo-admin-ui
     create: true

@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis
+  name: valkey
   namespace: tacokumo-admin
   labels:
-    app: redis
+    app: valkey
 spec:
   type: ClusterIP
   ports:
@@ -13,4 +13,4 @@ spec:
     protocol: TCP
     name: redis
   selector:
-    app: redis
+    app: valkey

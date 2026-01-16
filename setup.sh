@@ -32,6 +32,20 @@ function create_admindb_secret() {
     fi
 }
 
+function create_valkey_secret() {
+    echo "Creating Valkey credentials secret..."
+
+    # Check if secret already exists
+    if kubectl get secret tacokumo-admin-valkey-credentials -n tacokumo-admin >/dev/null 2>&1; then
+        echo "Valkey credentials secret 'tacokumo-admin-valkey-credentials' already exists, skipping creation..."
+    else
+        kubectl create secret generic tacokumo-admin-valkey-credentials \
+            --from-literal=password="" \
+            --namespace=tacokumo-admin
+        echo "Valkey credentials secret 'tacokumo-admin-valkey-credentials' created successfully"
+    fi
+}
+
 function create_github_oauth_secret() {
     echo "Creating GitHub OAuth credentials secret..."
 
@@ -66,6 +80,7 @@ function setup_admin_db() {
 
     kustomize build manifests/ | kubectl apply -f -
     create_admindb_secret
+    create_valkey_secret
 }
 
 function clone_admin_api() {
