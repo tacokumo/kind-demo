@@ -10,7 +10,7 @@ global:
     redis:
       host: "valkey.tacokumo-admin.svc.cluster.local"
       port: 6379
-      # secretName: "tacokumo-admin-valkey-credentials"  # 認証なしの場合はコメントアウト
+      secretName: "tacokumo-admin-valkey-credentials"
 
 # GitHub OAuth configuration
 github:
@@ -63,7 +63,7 @@ ui:
   replicaCount: 1
   image:
     repository: ghcr.io/tacokumo/admin-ui
-    tag: main-arm
+    tag: sha-63c59c0-arm
     pullPolicy: IfNotPresent
   config:
     apiBaseUrl: "http://tacokumo-admin-api:8080"

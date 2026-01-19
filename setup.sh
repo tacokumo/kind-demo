@@ -102,7 +102,7 @@ function clone_admin_api() {
 }
 
 function migrate_admin_db() {
-    echo "Running database migration for admin API..."
+    echo "Running database migration for admin API using Kubernetes Job..."
 
     # Check if tmp/admin-api directory exists
     if [ ! -d "tmp/admin-api" ]; then
@@ -110,129 +110,66 @@ function migrate_admin_db() {
         exit 1
     fi
 
-    # First ensure PostgreSQL pod is ready before port-forwarding
+    # Check if schema file exists
+    if [ ! -f "tmp/admin-api/sql/schema.sql" ]; then
+        echo "Error: Schema file not found at tmp/admin-api/sql/schema.sql"
+        exit 1
+    fi
+
+    # Wait for PostgreSQL pod to be ready
     echo "Waiting for PostgreSQL pod to be ready..."
     kubectl wait --for=condition=ready pod -l app=postgresql -n tacokumo-admin --timeout=300s
 
-    # Additional wait for database initialization
-    echo "Waiting for PostgreSQL database to be fully initialized..."
-    sleep 15
+    # Create ConfigMap from schema file
+    echo "Creating ConfigMap with database schema..."
+    kubectl create configmap admin-db-schema \
+        --from-file=schema.sql=tmp/admin-api/sql/schema.sql \
+        -n tacokumo-admin \
+        --dry-run=client -o yaml | kubectl apply -f -
 
-    # Kill any existing port-forward processes on port 5432
-    echo "Cleaning up any existing port-forward processes..."
-    if lsof -ti:5432 >/dev/null 2>&1; then
-        lsof -ti:5432 | xargs kill -9 2>/dev/null || true
-    fi
-    sleep 2
+    # Clean up any existing migration job
+    echo "Cleaning up any existing migration job..."
+    kubectl delete job admin-db-migration -n tacokumo-admin --ignore-not-found=true
 
-    # Start port-forward in background with improved error handling
-    echo "Setting up port-forward to PostgreSQL service..."
-    kubectl port-forward -n tacokumo-admin service/postgresql 5432:5432 > /tmp/port-forward.log 2>&1 &
-    PORT_FORWARD_PID=$!
+    # Wait for job deletion to complete
+    kubectl wait --for=delete job/admin-db-migration -n tacokumo-admin --timeout=30s 2>/dev/null || true
 
-    # Give port-forward some time to establish
-    sleep 5
+    # Apply the migration job
+    echo "Starting database migration job..."
+    kubectl apply -f manifests/migration-job.yaml
 
-    # Verify port-forward process is still running
-    if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
-        echo "Error: Port-forward process failed to start. Log:"
-        cat /tmp/port-forward.log
-        exit 1
-    fi
+    # Wait for job to complete
+    echo "Waiting for migration job to complete..."
+    if kubectl wait --for=condition=complete job/admin-db-migration -n tacokumo-admin --timeout=600s; then
+        echo "Database migration completed successfully!"
 
-    # Wait for port to be available with improved checking
-    echo "Waiting for port-forward to establish..."
-    PORT_READY=false
-    for i in {1..60}; do
-        # Check if port is listening and responding
-        if timeout 3 bash -c "echo > /dev/tcp/localhost/5432" 2>/dev/null; then
-            echo "Port-forward established successfully"
-            PORT_READY=true
-            break
-        fi
-        echo "Waiting for port-forward... ($i/60)"
-        sleep 2
+        # Show job logs for confirmation
+        echo "Migration job logs:"
+        kubectl logs -l job-name=admin-db-migration -n tacokumo-admin --tail=20
 
-        # Check if port-forward process is still alive
-        if ! kill -0 $PORT_FORWARD_PID 2>/dev/null; then
-            echo "Error: Port-forward process died. Restarting..."
-            kubectl port-forward -n tacokumo-admin service/postgresql 5432:5432 > /tmp/port-forward.log 2>&1 &
-            PORT_FORWARD_PID=$!
-            sleep 3
-        fi
-    done
+        # Clean up resources
+        echo "Cleaning up migration resources..."
+        kubectl delete configmap admin-db-schema -n tacokumo-admin --ignore-not-found=true
 
-    if [ "$PORT_READY" = false ]; then
-        echo "Error: Could not establish port-forward after 120 seconds"
-        echo "Port-forward log:"
-        cat /tmp/port-forward.log
-        kill $PORT_FORWARD_PID 2>/dev/null || true
-        exit 1
-    fi
+        return 0
+    else
+        echo "Migration job failed or timed out!"
 
-    # Test database connectivity before migration
-    echo "Testing database connectivity..."
-    for i in {1..10}; do
-        if timeout 5 psql "postgresql://postgres:password@localhost:5432/postgres" -c "SELECT 1;" >/dev/null 2>&1; then
-            echo "Database connection test successful"
-            break
-        fi
-        echo "Database connection test failed, retrying... ($i/10)"
-        sleep 3
+        # Show job status and logs for debugging
+        echo "Job status:"
+        kubectl get job admin-db-migration -n tacokumo-admin -o wide
 
-        if [ $i -eq 10 ]; then
-            echo "Error: Could not connect to database after 10 attempts"
-            kill $PORT_FORWARD_PID 2>/dev/null || true
-            exit 1
-        fi
-    done
+        echo "Job pods:"
+        kubectl get pods -l job-name=admin-db-migration -n tacokumo-admin
 
-    # Run migration with retry logic
-    echo "Running database migration..."
-    cd tmp/admin-api
+        echo "Migration job logs (last 50 lines):"
+        kubectl logs -l job-name=admin-db-migration -n tacokumo-admin --tail=50
 
-    MIGRATION_SUCCESS=false
-    for attempt in {1..3}; do
-        echo "Migration attempt $attempt/3..."
+        # Don't clean up on failure for debugging
+        echo "Leaving job and ConfigMap for debugging. Clean up manually with:"
+        echo "kubectl delete job admin-db-migration -n tacokumo-admin"
+        echo "kubectl delete configmap admin-db-schema -n tacokumo-admin"
 
-        # Check if running on macOS and adjust host accordingly
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS - use host.docker.internal for Docker to access host
-            docker run --rm \
-                -v "$(pwd)/sql/schema.sql:/schema.sql" \
-                arigaio/atlas:latest schema apply \
-                --url "postgres://admin_api:password@host.docker.internal:5432/tacokumo_admin_db?sslmode=disable" \
-                --dev-url "postgres://postgres:password@host.docker.internal:5432/postgres?sslmode=disable" \
-                --to "file:///schema.sql" --auto-approve
-        else
-            # Linux - use --network host
-            make migrate IS_DOCKER=false HOST=localhost PORT=5432 USER=admin_api PASSWORD=password DB=tacokumo_admin_db DEV_USER=postgres DEV_PASSWORD=password DEV_DB=postgres
-        fi
-
-        MIGRATION_EXIT_CODE=$?
-
-        if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
-            echo "Database migration completed successfully"
-            MIGRATION_SUCCESS=true
-            break
-        else
-            echo "Migration attempt $attempt failed with exit code $MIGRATION_EXIT_CODE"
-            if [ $attempt -lt 3 ]; then
-                echo "Retrying in 10 seconds..."
-                sleep 10
-            fi
-        fi
-    done
-
-    cd ../..
-
-    # Kill port-forward process
-    echo "Cleaning up port-forward..."
-    kill $PORT_FORWARD_PID 2>/dev/null || true
-    rm -f /tmp/port-forward.log
-
-    if [ "$MIGRATION_SUCCESS" = false ]; then
-        echo "Database migration failed after 3 attempts"
         exit 1
     fi
 }

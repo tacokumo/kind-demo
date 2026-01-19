@@ -4,3 +4,4 @@ resources:
 - postgresql.svc.yaml
 - valkey.deployment.yaml
 - valkey.svc.yaml
+- migration-job.yaml
