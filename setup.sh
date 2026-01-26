@@ -83,36 +83,36 @@ function setup_admin_db() {
     create_valkey_secret
 }
 
-function clone_admin_api() {
-    echo "Cloning admin-api repository..."
+function clone_admin() {
+    echo "Cloning admin repository..."
 
     # Create tmp directory if it doesn't exist
     mkdir -p tmp
 
-    # Remove existing admin-api directory if it exists
-    if [ -d "tmp/admin-api" ]; then
-        echo "Removing existing admin-api directory..."
-        rm -rf tmp/admin-api
+    # Remove existing admin directory if it exists
+    if [ -d "tmp/admin" ]; then
+        echo "Removing existing admindirectory..."
+        rm -rf tmp/admin
     fi
 
     # Clone the repository
-    git clone https://github.com/tacokumo/admin-api tmp/admin-api
+    git clone https://github.com/tacokumo/admin tmp/admin
 
-    echo "Admin API repository cloned successfully to tmp/admin-api"
+    echo "Admin repository cloned successfully to tmp/admin"
 }
 
 function migrate_admin_db() {
-    echo "Running database migration for admin API using Kubernetes Job..."
+    echo "Running database migration for admin using Kubernetes Job..."
 
-    # Check if tmp/admin-api directory exists
-    if [ ! -d "tmp/admin-api" ]; then
-        echo "Error: tmp/admin-api directory not found. Please run clone_admin_api first."
+    # Check if tmp/admini directory exists
+    if [ ! -d "tmp/admin" ]; then
+        echo "Error: tmp/admin directory not found. Please run clone_admin first."
         exit 1
     fi
 
     # Check if schema file exists
-    if [ ! -f "tmp/admin-api/sql/schema.sql" ]; then
-        echo "Error: Schema file not found at tmp/admin-api/sql/schema.sql"
+    if [ ! -f "tmp/admin/sql/schema.sql" ]; then
+        echo "Error: Schema file not found at tmp/admin/sql/schema.sql"
         exit 1
     fi
 
@@ -123,7 +123,7 @@ function migrate_admin_db() {
     # Create ConfigMap from schema file
     echo "Creating ConfigMap with database schema..."
     kubectl create configmap admin-db-schema \
-        --from-file=schema.sql=tmp/admin-api/sql/schema.sql \
+        --from-file=schema.sql=tmp/admin/sql/schema.sql \
         -n tacokumo-admin \
         --dry-run=client -o yaml | kubectl apply -f -
 
@@ -189,7 +189,7 @@ function apply_helmfile() {
 setup_cluster
 # add_hosts_entries
 setup_admin_db
-clone_admin_api
+clone_admin
 migrate_admin_db
 create_github_oauth_secret
 apply_helmfile
