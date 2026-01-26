@@ -18,7 +18,7 @@ export GITHUB_CLIENT_ID="your-client-id"
 export GITHUB_CLIENT_SECRET="your-client-secret"
 
 # オプション
-export GITHUB_OAUTH_CALLBACK_URL="http://localhost:8080/v1alpha1/auth/callback"
+export GITHUB_OAUTH_CALLBACK_URL="http://admin.tacokumo.local/v1alpha1/auth/callback"
 export GITHUB_OAUTH_ALLOWED_ORGS="your-org"
 
 # 実行

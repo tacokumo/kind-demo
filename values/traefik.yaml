@@ -1,0 +1,94 @@
+# Traefik configuration for KinD
+# Optimized for local development with NodePort service
+
+# Global configuration
+globalArguments:
+  - "--global.checknewversion=false"
+  - "--global.sendanonymoususage=false"
+
+# Deployment configuration
+deployment:
+  enabled: true
+  replicas: 1
+
+# Service configuration - NodePort for KinD
+service:
+  enabled: true
+  type: NodePort
+  spec:
+    ports:
+      - name: http
+        port: 80
+        protocol: TCP
+        targetPort: http
+        nodePort: 30080
+      - name: https
+        port: 443
+        protocol: TCP
+        targetPort: https
+        nodePort: 30443
+
+# Ports configuration
+ports:
+  web:
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    nodePort: 30080
+  websecure:
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    nodePort: 30443
+    tls:
+      enabled: false  # Disable TLS for local development
+  traefik:
+    port: 9000
+    expose:
+      default: false
+    exposedPort: 9000
+
+# IngressRoute configuration for Traefik dashboard (optional)
+ingressRoute:
+  dashboard:
+    enabled: true
+    matchRule: "Host(`traefik.tacokumo.local`)"
+    entryPoints: ["web"]
+
+# Provider configurations
+providers:
+  kubernetesCRD:
+    enabled: true
+  kubernetesIngress:
+    enabled: true
+    ingressClass: traefik
+
+# Resource limits
+resources:
+  requests:
+    cpu: "100m"
+    memory: "50Mi"
+  limits:
+    cpu: "300m"
+    memory: "150Mi"
+
+# Logs
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: true  # Allow insecure API access for local development
+
+# Entry points
+entryPoints:
+  web:
+    address: ":8000"
+  websecure:
+    address: ":8443"

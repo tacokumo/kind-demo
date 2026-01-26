@@ -3,3 +3,12 @@ controller:
     image:
       repository: ghcr.io/tacokumo/portal-controller-kubernetes
       tag: main-arm
+
+# Security context settings
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532

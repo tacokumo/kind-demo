@@ -13,7 +13,20 @@ function setup_cluster() {
 
 function add_hosts_entries() {
     echo "Adding entries to /etc/hosts..."
-    cat hosts-addition.txt | sudo tee -a /etc/hosts
+    while IFS= read -r line; do
+        # Skip empty lines
+        if [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]]; then
+            continue
+        fi
+
+        # Check if the line already exists in /etc/hosts
+        if ! grep -Fq "$line" /etc/hosts; then
+            echo "Adding: $line"
+            echo "$line" | sudo tee -a /etc/hosts
+        else
+            echo "Already exists: $line"
+        fi
+    done < hosts-addition.txt
 }
 
 function create_admindb_secret() {
@@ -174,22 +187,89 @@ function migrate_admin_db() {
     fi
 }
 
+function wait_for_traefik_ready() {
+    echo "Waiting for Traefik controller to be ready..."
+
+    # Wait for Traefik deployment to be available
+    kubectl wait --for=condition=available deployment/traefik -n traefik-system --timeout=300s
+
+    # Wait for Traefik pods to be ready
+    kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=traefik -n traefik-system --timeout=300s
+
+    echo "Traefik controller is ready"
+}
+
+function validate_dns_resolution() {
+    echo "Validating DNS resolution for admin.tacokumo.local..."
+
+    # Check if the hostname resolves to 127.0.0.1
+    if getent hosts admin.tacokumo.local | grep -q "127.0.0.1"; then
+        echo "DNS resolution for admin.tacokumo.local is working"
+        return 0
+    else
+        echo "Warning: admin.tacokumo.local does not resolve to 127.0.0.1"
+        echo "Please ensure hosts file entries are properly added"
+        return 1
+    fi
+}
+
+function validate_ingress_connectivity() {
+    echo "Validating Ingress connectivity for tacokumo-admin..."
+
+    # Wait a moment for ingress to be processed
+    sleep 5
+
+    # Check if we can reach the admin service through Ingress
+    echo "Testing HTTP connectivity to admin.tacokumo.local..."
+
+    local max_attempts=30
+    local attempt=1
+
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 --max-time 5 "http://admin.tacokumo.local" | grep -q "200\|401\|404"; then
+            echo "Successfully connected to admin.tacokumo.local"
+            echo "Tacokumo admin is accessible via Ingress at: http://admin.tacokumo.local"
+            return 0
+        fi
+
+        echo "Attempt $attempt/$max_attempts: Waiting for admin service to be available..."
+        sleep 5
+        attempt=$((attempt + 1))
+    done
+
+    echo "Warning: Could not establish connectivity to admin.tacokumo.local after $max_attempts attempts"
+    echo "The service may still be starting up. You can check manually with:"
+    echo "  curl -v http://admin.tacokumo.local"
+    return 1
+}
+
 function apply_helmfile() {
     echo "Applying Helm charts using Helmfile..."
 
     # Set defaults for optional environment variables
-    GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-"http://localhost:8080/v1alpha1/auth/callback"}
-    GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-""}
+    GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-"http://admin.tacokumo.local/v1alpha1/auth/github/callback"}
+    GITHUB_ORG=${GITHUB_ORG:-"tacokumo"}
 
     helmfile sync -f helmfile.yaml.gotmpl \
         --state-values-set githubOAuthCallbackUrl="${GITHUB_OAUTH_CALLBACK_URL}" \
-        --state-values-set githubOAuthAllowedOrgs="${GITHUB_OAUTH_ALLOWED_ORGS}"
+        --state-values-set githubOrg="${GITHUB_ORG}"
 }
 
 setup_cluster
-# add_hosts_entries
+add_hosts_entries
 setup_admin_db
 clone_admin
 migrate_admin_db
 create_github_oauth_secret
 apply_helmfile
+wait_for_traefik_ready
+validate_dns_resolution
+validate_ingress_connectivity
+
+echo ""
+echo "🎉 Setup completed! Tacokumo Admin should be accessible at:"
+echo "   http://admin.tacokumo.local"
+echo ""
+echo "Optional: Traefik Dashboard is available at:"
+echo "   http://traefik.tacokumo.local"
+echo ""

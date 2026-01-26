@@ -1,1 +1,2 @@
-127.0.0.1 argocd.example.com
+127.0.0.1 admin.tacokumo.local
+127.0.0.1 traefik.tacokumo.local
