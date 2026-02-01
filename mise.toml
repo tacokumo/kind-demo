@@ -1,0 +1,4 @@
+[tools]
+helmfile = "latest"
+kind = "latest"
+kubectl = "latest"

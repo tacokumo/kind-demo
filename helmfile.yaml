@@ -1,0 +1,11 @@
+repositories:
+  - name: tacokumo
+    url: https://tacokumo.github.io/helm-charts
+
+releases:
+  - name: portal-controller-kubernetes
+    namespace: portal-controller-system
+    chart: tacokumo/portal-controller-kubernetes
+    version: 0.4.0
+    values:
+    - ./values/portal-controller-kubernetes.yaml
