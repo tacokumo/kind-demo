@@ -1,0 +1,7 @@
+crds:
+  install: true
+controller:
+  managerContainer:
+    image:
+      repository: ghcr.io/tacokumo/portal-controller-kubernetes
+      tag: v0.5.0

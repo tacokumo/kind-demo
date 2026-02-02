@@ -1,0 +1,23 @@
+app_name: "nginx-app"
+service:
+  name: "nginx"
+  http:
+    - target_port: 8080
+      force_https: false
+  scale:
+    min: 1
+    max: 1
+    metric:
+      type: "error_rate"
+      threshold: 99
+  machine:
+    cpu: "50m"
+    memory: "256Mi"
+build:
+  image: "nginx:latest"
+stages:
+  - name: "production"
+    policy: 
+      type: "branch"
+      branch:
+        name: "main"
