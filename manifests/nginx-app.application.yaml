@@ -1,0 +1,11 @@
+apiVersion: tacokumo.github.io/v1alpha1
+kind: Application
+metadata:
+  namespace: default
+  name: nginx-app
+spec:
+  releaseTemplate:
+    repo:
+      url: "https://github.com/tacokumo/kind-demo"
+    appConfigPath: "./nginx-app/appconfig.yaml"
+    appConfigBranch: "main"

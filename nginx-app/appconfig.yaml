@@ -2,7 +2,7 @@ app_name: "nginx-app"
 service:
   name: "nginx"
   http:
-    - target_port: 8080
+    - target_port: 80
       force_https: false
   scale:
     min: 1
