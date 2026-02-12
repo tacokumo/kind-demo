@@ -2,11 +2,11 @@
 
 TACOKUMOクラスタをKinD上で動作させるデモ用リポジトリ。
 
-## nginx-app
+## All-in-one
 
 ```shell
-$ kind create cluster
-$ helmfile sync -f helmfile.yaml
+$ bash setup.sh
+$ kubectl get pods -n sample-project
 $ kubectl kustomize manifests/ | kubectl apply -f -
 $ kubectl port-forward svc/nginx-app-production 8080:80
 
@@ -36,3 +36,4 @@ Commercial support is available at
 </body>
 </html>
 ```
+

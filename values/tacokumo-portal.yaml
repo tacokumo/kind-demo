@@ -1,0 +1,73 @@
+api:
+  portalName: "sample-project"
+  logLevel: "info"
+
+  image:
+    repository: ghcr.io/tacokumo/portal-api
+    tag: "main"
+    pullPolicy: IfNotPresent
+
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetMemoryUtilizationPercentage: 80
+
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 1323
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  livenessProbe:
+    httpGet:
+      path: /health/liveness
+      port: 1323
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  readinessProbe:
+    httpGet:
+      path: /health/readiness
+      port: 1323
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  rbac:
+    create: true
+
+  serviceAccount:
+    create: true
+    name: "portal-api"
+    annotations: {}
+
+  terminationGracePeriodSeconds: 30
+
+  annotations: {}
+  podAnnotations: {}
+  labels: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  imagePullSecrets: []
+  env: []
+  envFrom: []
