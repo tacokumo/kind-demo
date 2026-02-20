@@ -1,0 +1,34 @@
+deployment:
+  envoyGateway:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  envoyProxy:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+config:
+  envoyGateway:
+    logging:
+      level:
+        default: info
+    gateway:
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+# kindクラスタでの動作に最適化
+service:
+  type: NodePort
+  annotations:
+    # kindクラスタでのアクセスを可能にする
+    metallb.universe.tf/loadBalancerIPs: "172.19.255.200"

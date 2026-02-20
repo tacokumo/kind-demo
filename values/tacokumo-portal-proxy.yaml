@@ -1,0 +1,17 @@
+portalProxy:
+  replicaCount: 1
+  baseDomain: "localhost"
+
+  route:
+    http:
+      enabled: true
+      parentRefs:
+        - name: kind-gateway
+          namespace: envoy-gateway-system
+      hostnames:
+        - "proxy.localhost"
+      rules:
+        - matches:
+          - path:
+              type: PathPrefix
+              value: /

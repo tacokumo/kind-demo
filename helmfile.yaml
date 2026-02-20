@@ -15,3 +15,15 @@ releases:
     version: 0.8.0
     values:
     - ./values/portal-controller-kubernetes.yaml
+  - name: eg
+    namespace: envoy-gateway-system
+    chart: oci://docker.io/envoyproxy/gateway-helm
+    version: v1.7.0
+    values:
+    - ./values/envoy-gateway.yaml
+  - name: portal-proxy
+    namespace: portal-proxy
+    chart: tacokumo/tacokumo-portal-proxy
+    version: 0.2.0
+    values:
+    - ./values/tacokumo-portal-proxy.yaml
